@@ -10,7 +10,6 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Attach Authorization Bearer token automatically if logged in
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
@@ -27,6 +26,8 @@ export const projectsApi = {
   getProjects: () => api.get('/projects'),
   getProject: (id) => api.get(`/projects/${id}`),
   createProject: (data) => api.post('/projects', data),
+  updateProject: (id, data) => api.put(`/projects/${id}`, data),
+  deleteProject: (id) => api.delete(`/projects/${id}`),
 };
 
 export const documentsApi = {
@@ -59,6 +60,7 @@ export const userStoriesApi = {
 export const tasksApi = {
   getTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
   createTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
+  updateTask: (projectId, taskId, data) => api.put(`/projects/${projectId}/tasks/${taskId}`, data),
   aiGenerate: (projectId) => api.post(`/projects/${projectId}/tasks/ai-generate`),
 };
 

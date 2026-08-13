@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { documentsApi } from '../services/api';
+import { documentsApi, requirementsApi, userStoriesApi, tasksApi, conflictsApi } from '../services/api';
 import MetricCard from '../components/dashboard/MetricCard';
 import RecentDocuments from '../components/dashboard/RecentDocuments';
 import ProjectInsights from '../components/dashboard/ProjectInsights';
-import { FileText, Database, HardDrive, Cpu, Calendar, Clock } from 'lucide-react';
+import { FileText, Database, HardDrive, Cpu, Calendar, Clock, Download } from 'lucide-react';
+import { exportProjectReport } from '../utils/reportExporter';
 
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -28,6 +29,7 @@ export default function Overview() {
   const { activeProject, projectId } = useOutletContext();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -38,6 +40,30 @@ export default function Overview() {
       .finally(() => setLoading(false));
   }, [projectId]);
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const [reqsRes, storiesRes, tasksRes, conflictsRes] = await Promise.all([
+        requirementsApi.getRequirements(projectId).catch(() => ({ data: [] })),
+        userStoriesApi.getStories(projectId).catch(() => ({ data: [] })),
+        tasksApi.getTasks(projectId).catch(() => ({ data: [] })),
+        conflictsApi.getConflicts(projectId).catch(() => ({ data: [] })),
+      ]);
+
+      exportProjectReport({
+        project: activeProject,
+        requirements: reqsRes.data || [],
+        stories: storiesRes.data || [],
+        tasks: tasksRes.data || [],
+        conflicts: conflictsRes.data || [],
+      });
+    } catch {
+      alert('Failed to export project brief.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const indexedDocs = documents.filter(d => d.indexed);
   const totalChunks = documents.reduce((acc, d) => acc + (d.chunk_count || 0), 0);
   const totalStorage = documents.reduce((acc, d) => acc + (d.file_size || 0), 0);
@@ -45,11 +71,22 @@ export default function Overview() {
   return (
     <div className="space-y-6">
       {/* Overview Top Header */}
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Project Dashboard</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Enterprise intelligence & knowledge base overview for <strong>{activeProject?.name || 'this project'}</strong>.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Project Dashboard</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Enterprise intelligence & knowledge base overview for <strong>{activeProject?.name || 'this project'}</strong>.
+          </p>
+        </div>
+
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Export Project Brief (.md)</span>
+        </button>
       </div>
 
       {/* Metric Cards Grid */}

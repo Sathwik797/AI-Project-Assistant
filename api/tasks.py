@@ -31,6 +31,14 @@ class TaskCreate(BaseModel):
     task_code: Optional[str] = None
 
 
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    assignee: Optional[str] = None
+
+
 @router.get("", response_model=List[TaskSchema])
 def get_project_tasks(project_id: int):
     with get_db_session() as db:
@@ -90,6 +98,40 @@ def create_task(project_id: int, payload: TaskCreate):
             assignee=new_task.assignee,
             due_date=new_task.due_date,
             created_at=new_task.created_at.isoformat()
+        )
+
+
+@router.put("/{task_id}", response_model=TaskSchema)
+def update_task(project_id: int, task_id: int, payload: TaskUpdate):
+    with get_db_session() as db:
+        task = db.query(TaskItem).filter(TaskItem.id == task_id, TaskItem.project_id == project_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        if payload.title is not None:
+            task.title = payload.title.strip()
+        if payload.description is not None:
+            task.description = payload.description.strip()
+        if payload.status is not None:
+            task.status = payload.status
+        if payload.priority is not None:
+            task.priority = payload.priority
+        if payload.assignee is not None:
+            task.assignee = payload.assignee
+        
+        db.flush()
+
+        return TaskSchema(
+            id=task.id,
+            project_id=task.project_id,
+            task_code=task.task_code,
+            title=task.title,
+            description=task.description,
+            status=task.status,
+            priority=task.priority,
+            assignee=task.assignee,
+            due_date=task.due_date,
+            created_at=task.created_at.isoformat()
         )
 
 

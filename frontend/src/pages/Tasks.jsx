@@ -57,6 +57,15 @@ export default function Tasks() {
     }
   };
 
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await tasksApi.updateTask(projectId, taskId, { status: newStatus });
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    } catch {
+      alert('Failed to update task status.');
+    }
+  };
+
   const handleAiGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -107,14 +116,14 @@ export default function Tasks() {
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
             <button
               onClick={() => setViewMode('board')}
-              className={`p-1.5 rounded-md flex items-center gap-1 font-semibold ${viewMode === 'board' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-2xs' : 'text-slate-500'}`}
+              className={`p-1.5 rounded-md flex items-center gap-1 font-semibold cursor-pointer ${viewMode === 'board' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-2xs' : 'text-slate-500'}`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Board</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md flex items-center gap-1 font-semibold ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-2xs' : 'text-slate-500'}`}
+              className={`p-1.5 rounded-md flex items-center gap-1 font-semibold cursor-pointer ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-2xs' : 'text-slate-500'}`}
             >
               <LayoutList className="w-3.5 h-3.5" />
               <span>List</span>
@@ -124,7 +133,7 @@ export default function Tasks() {
           <button
             onClick={handleAiGenerate}
             disabled={isGenerating}
-            className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50"
+            className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             <span>Break Down Tasks with AI</span>
@@ -132,7 +141,7 @@ export default function Tasks() {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Task</span>
@@ -164,14 +173,24 @@ export default function Tasks() {
                     <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg p-3 shadow-2xs space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[11px] text-blue-600 font-bold">{t.task_code}</span>
-                        <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded text-[9px] font-bold">
-                          {t.priority}
-                        </span>
+                        <select
+                          value={t.status}
+                          onChange={(e) => handleStatusChange(t.id, e.target.value)}
+                          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 outline-none"
+                        >
+                          <option value="To Do">To Do</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Review">Review</option>
+                          <option value="Done">Done</option>
+                        </select>
                       </div>
                       <p className="font-bold text-slate-900 dark:text-white leading-tight">{t.title}</p>
                       {t.description && <p className="text-[11px] text-slate-400 line-clamp-2">{t.description}</p>}
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[10px] text-slate-400">
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
                         <span>{t.assignee}</span>
+                        <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded text-[9px] font-bold">
+                          {t.priority}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -198,7 +217,18 @@ export default function Tasks() {
                 <tr key={t.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="px-5 py-3.5 font-mono text-[11px] text-blue-600 font-bold">{t.task_code}</td>
                   <td className="px-4 py-3.5 font-semibold text-slate-900 dark:text-white">{t.title}</td>
-                  <td className="px-4 py-3.5">{t.status}</td>
+                  <td className="px-4 py-3.5">
+                    <select
+                      value={t.status}
+                      onChange={(e) => handleStatusChange(t.id, e.target.value)}
+                      className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-700 dark:text-slate-300 outline-none"
+                    >
+                      <option value="To Do">To Do</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Review">Review</option>
+                      <option value="Done">Done</option>
+                    </select>
+                  </td>
                   <td className="px-4 py-3.5">{t.priority}</td>
                   <td className="px-4 py-3.5 text-slate-500">{t.assignee}</td>
                 </tr>

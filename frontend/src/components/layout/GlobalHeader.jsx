@@ -4,11 +4,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Zap, Search, Sun, Moon, Bell } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import GlobalSearchModal from '../modals/GlobalSearchModal';
+import NotificationDrawer from '../modals/NotificationDrawer';
 
 export default function GlobalHeader({ activeProject }) {
   const { isDark, toggleTheme } = useTheme();
   const { user } = useAuth();
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   return (
     <>
@@ -33,7 +35,7 @@ export default function GlobalHeader({ activeProject }) {
         <div className="hidden md:flex flex-1 max-w-sm mx-4">
           <button
             onClick={() => setShowSearchModal(true)}
-            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-md pl-3 pr-3 py-1.5 text-xs text-slate-400 dark:text-slate-400 hover:border-blue-500 flex items-center justify-between transition-all"
+            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-md pl-3 pr-3 py-1.5 text-xs text-slate-400 dark:text-slate-400 hover:border-blue-500 flex items-center justify-between transition-all cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-slate-400" />
@@ -49,17 +51,19 @@ export default function GlobalHeader({ activeProject }) {
 
           <button
             onClick={toggleTheme}
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
             title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
             {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
 
           <button
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+            onClick={() => setShowNotifications(true)}
+            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer relative"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
+            <span className="w-2 h-2 rounded-full bg-blue-600 absolute top-1 right-1"></span>
           </button>
 
           {/* User Avatar Pill */}
@@ -72,6 +76,7 @@ export default function GlobalHeader({ activeProject }) {
       </header>
 
       {showSearchModal && <GlobalSearchModal onClose={() => setShowSearchModal(false)} />}
+      {showNotifications && <NotificationDrawer onClose={() => setShowNotifications(false)} />}
     </>
   );
 }

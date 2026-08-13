@@ -73,7 +73,7 @@ export default function WorkspaceLayout() {
           </p>
           <button
             onClick={() => navigate('/')}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Projects</span>
@@ -94,7 +94,7 @@ export default function WorkspaceLayout() {
           <p className="text-xs text-slate-500 dark:text-slate-400">{error}</p>
           <button
             onClick={() => navigate(0)}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <span>Retry Connection</span>
           </button>
@@ -106,7 +106,10 @@ export default function WorkspaceLayout() {
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors">
       <GlobalHeader activeProject={activeProject} />
-      <ProjectHeader activeProject={activeProject} />
+      <ProjectHeader
+        activeProject={activeProject}
+        onProjectUpdated={(updated) => setActiveProject(updated)}
+      />
       <ProjectNavigation projectId={currentProjectId} />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
