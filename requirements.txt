@@ -14,3 +14,5 @@ python-multipart
 httpx
 pyjwt
 passlib[bcrypt]
+pydantic
+cryptography
