@@ -1,4 +1,5 @@
 from typing import List
+import logging
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
 
 from api.schemas import DocumentResponse, DocumentDetailResponse
@@ -9,13 +10,18 @@ from services.document_service import (
     get_document,
     delete_document
 )
-from services.rag_ingestion_service import get_document_index_status
+from services.rag_ingestion_service import (
+    get_document_index_status,
+    index_document,
+    ensure_project_documents_indexed
+)
 from services.vector_store_service import delete_document_chunks
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Documents"])
 
 
-# Compatibility adapter for process_and_save_document which expects .name and .getvalue()
 class FastAPIFileAdapter:
     def __init__(self, upload_file: UploadFile, content: bytes):
         self.name = upload_file.filename
@@ -34,6 +40,9 @@ def list_project_documents(project_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found."
         )
+
+    # Ensure all documents for this project are indexed in ChromaDB
+    ensure_project_documents_indexed(project_id)
 
     docs = get_documents_by_project(project_id)
     response_list = []
@@ -56,7 +65,7 @@ def list_project_documents(project_id: int):
 async def upload_document(project_id: int, file: UploadFile = File(...)):
     """
     Uploads and processes a project document (PDF, DOCX, TXT up to 15 MB).
-    Extracts raw text and saves metadata to MySQL.
+    Extracts raw text, saves metadata to MySQL, and auto-indexes into ChromaDB.
     """
     proj = get_project(project_id)
     if not proj:
@@ -87,6 +96,15 @@ async def upload_document(project_id: int, file: UploadFile = File(...)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=msg
         )
+
+    # Automatically index document into ChromaDB upon upload
+    if new_doc and new_doc.raw_text and new_doc.raw_text.strip():
+        try:
+            idx_ok, idx_msg, _ = index_document(new_doc.id)
+            if idx_ok:
+                logger.info(f"Auto-indexed document ID {new_doc.id} ({new_doc.filename}) on upload.")
+        except Exception as idx_err:
+            logger.error(f"Auto-indexing warning for document ID {new_doc.id}: {idx_err}")
 
     idx_status = get_document_index_status(new_doc.id)
 

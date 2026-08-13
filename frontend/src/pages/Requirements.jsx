@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { requirementsApi } from '../services/api';
 import AiReviewModal from '../components/modals/AiReviewModal';
-import { ListCheck, Plus, Sparkles, Filter, Loader2, CheckCircle2 } from 'lucide-react';
+import RequirementDetailDrawer from '../components/modals/RequirementDetailDrawer';
+import { ListCheck, Plus, Sparkles, Filter, Loader2, CheckCircle2, Search, Eye, ArrowRight } from 'lucide-react';
 
 export default function Requirements() {
   const { activeProject, projectId } = useOutletContext();
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('All');
+  const [filterPriority, setFilterPriority] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedReq, setSelectedReq] = useState(null);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -33,9 +37,12 @@ export default function Requirements() {
     fetchRequirements();
   }, [projectId]);
 
-  const filteredRequirements = requirements.filter(r => 
-    filterType === 'All' || r.req_type === filterType
-  );
+  const filteredRequirements = requirements.filter(r => {
+    const matchesSearch = !searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()) || (r.req_code && r.req_code.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = filterType === 'All' || r.req_type === filterType;
+    const matchesPriority = filterPriority === 'All' || r.priority === filterPriority;
+    return matchesSearch && matchesType && matchesPriority;
+  });
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -96,7 +103,7 @@ export default function Requirements() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Requirements Matrix</h3>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Jira-Style Requirements Matrix</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Manage functional, technical, and business specifications for <strong>{activeProject?.name || 'this project'}</strong>.
           </p>
@@ -106,7 +113,7 @@ export default function Requirements() {
           <button
             onClick={handleAiExtract}
             disabled={isGenerating}
-            className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50"
+            className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
           >
             {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             <span>Extract Requirements with AI</span>
@@ -114,7 +121,7 @@ export default function Requirements() {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Requirement</span>
@@ -122,31 +129,52 @@ export default function Requirements() {
         </div>
       </div>
 
-      {/* Filter Tabs Bar */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs">
-        <Filter className="w-3.5 h-3.5 text-slate-400" />
-        <span className="font-semibold text-slate-500">Filter:</span>
-        {['All', 'Functional', 'Technical', 'Non-functional'].map((t) => (
-          <button
-            key={t}
-            onClick={() => setFilterType(t)}
-            className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-              filterType === t
-                ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3 shadow-2xs">
+        <div className="relative flex-1 w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search REQ-001 or title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
           >
-            {t}
-          </button>
-        ))}
+            <option value="All">All Types</option>
+            <option value="Functional">Functional</option>
+            <option value="Technical">Technical</option>
+            <option value="Non-functional">Non-functional</option>
+          </select>
+
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+          >
+            <option value="All">All Priorities</option>
+            <option value="High">High Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
+        </div>
       </div>
 
-      {/* Requirement Table */}
+      {/* High-Density Jira-Style Requirement Table */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-2xs overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            <span>Loading requirements...</span>
+            <span>Loading requirements matrix...</span>
           </div>
         ) : filteredRequirements.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-400 space-y-2">
@@ -163,11 +191,17 @@ export default function Requirements() {
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Traceability</th>
+                  <th className="px-5 py-3 text-right">Inspect</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200 font-medium">
                 {filteredRequirements.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr
+                    key={r.id}
+                    onClick={() => setSelectedReq(r)}
+                    className="hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                  >
                     <td className="px-5 py-3.5 font-mono text-[11px] text-blue-600 font-bold">{r.req_code}</td>
                     <td className="px-4 py-3.5 font-semibold text-slate-900 dark:text-white">
                       <div>{r.title}</div>
@@ -175,15 +209,28 @@ export default function Requirements() {
                     </td>
                     <td className="px-4 py-3.5 text-slate-500">{r.req_type}</td>
                     <td className="px-4 py-3.5">
-                      <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded text-[10px] font-bold">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        r.priority === 'High' ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}>
                         {r.priority}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                         <span>{r.status}</span>
                       </span>
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-[10px] text-slate-400">
+                      <span>{r.req_code} → US-001 → Tasks</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedReq(r); }}
+                        className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -192,6 +239,14 @@ export default function Requirements() {
           </div>
         )}
       </div>
+
+      {/* Requirement Detail Drawer */}
+      {selectedReq && (
+        <RequirementDetailDrawer
+          requirement={selectedReq}
+          onClose={() => setSelectedReq(null)}
+        />
+      )}
 
       {/* Manual Add Requirement Modal */}
       {showAddModal && (
@@ -254,14 +309,14 @@ export default function Requirements() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded font-semibold text-slate-600 dark:text-slate-300"
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded font-semibold text-slate-600 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700"
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 cursor-pointer"
                 >
                   Save Requirement
                 </button>

@@ -3,7 +3,8 @@ import { useOutletContext } from 'react-router-dom';
 import { documentsApi, ragApi } from '../services/api';
 import DocumentUpload from '../components/documents/DocumentUpload';
 import DocumentTable from '../components/documents/DocumentTable';
-import { FileText, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import DocumentSplitWorkspace from '../components/documents/DocumentSplitWorkspace';
+import { FileText, X, AlertCircle, CheckCircle2, Search, Filter } from 'lucide-react';
 
 export default function Documents() {
   const { activeProject, projectId } = useOutletContext();
@@ -14,6 +15,8 @@ export default function Documents() {
   const [deletingId, setDeletingId] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [statusMessage, setStatusMessage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('ALL');
 
   const fetchDocuments = () => {
     if (!projectId) return;
@@ -87,14 +90,46 @@ export default function Documents() {
     }
   };
 
+  const filteredDocs = documents.filter((d) => {
+    const matchesSearch = !searchQuery || d.filename.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === 'ALL' || (d.file_type && d.file_type.toLowerCase() === typeFilter.toLowerCase());
+    return matchesSearch && matchesType;
+  });
+
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Project Knowledge Base</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Manage and index document sources used by the AI RAG engine for <strong>{activeProject?.name || 'this project'}</strong>.
-        </p>
+      {/* Top Header & Search Filter Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Project Knowledge Base</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Manage, inspect and index document sources for <strong>{activeProject?.name || 'this project'}</strong>.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-48">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search docs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+            />
+          </div>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none shadow-2xs cursor-pointer"
+          >
+            <option value="ALL">All Types</option>
+            <option value="PDF">PDF</option>
+            <option value="DOCX">DOCX</option>
+            <option value="TXT">TXT</option>
+          </select>
+        </div>
       </div>
 
       {/* Notification Banner */}
@@ -106,7 +141,7 @@ export default function Documents() {
             {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />}
             <span>{statusMessage.text}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
+          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">×</button>
         </div>
       )}
 
@@ -115,7 +150,7 @@ export default function Documents() {
 
       {/* Document Table */}
       <DocumentTable
-        documents={documents}
+        documents={filteredDocs}
         onView={handleView}
         onIndex={handleIndex}
         onDelete={handleDelete}
@@ -123,37 +158,13 @@ export default function Documents() {
         deletingId={deletingId}
       />
 
-      {/* Document View Raw Text Modal */}
+      {/* Interactive Split Document Workspace Modal */}
       {selectedDoc && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{selectedDoc.filename}</h4>
-                  <span className="text-[11px] text-slate-400 uppercase font-semibold">{selectedDoc.file_type} · {(selectedDoc.file_size / 1024).toFixed(1)} KB</span>
-                </div>
-              </div>
-              <button onClick={() => setSelectedDoc(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-xs font-mono text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-              {selectedDoc.raw_text || 'No extracted text available.'}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="px-4 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold rounded-lg text-xs"
-              >
-                Close View
-              </button>
-            </div>
-          </div>
-        </div>
+        <DocumentSplitWorkspace
+          document={selectedDoc}
+          projectId={projectId}
+          onClose={() => setSelectedDoc(null)}
+        />
       )}
     </div>
   );

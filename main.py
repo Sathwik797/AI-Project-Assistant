@@ -53,15 +53,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS Middleware
-origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+# Configure CORS Middleware to allow all localhost ports (5173, 5174, 5175, etc.)
+origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:3000")
 cors_origins = [origin.strip() for origin in origins_env.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

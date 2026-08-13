@@ -1,4 +1,5 @@
 import os
+import logging
 import jwt
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from services.database import get_db_session
 from services.models import User
 
+logger = logging.getLogger("ai_project_assistant.auth")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ai_project_assistant_secure_jwt_secret_2026")
@@ -87,6 +89,7 @@ def get_current_user_from_token(authorization: str = Header(None)) -> UserRespon
 @router.post("/signup", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest):
     email = payload.email.strip().lower()
+    logger.info(f"POST /api/auth/signup - processing signup for normalized email: '{email}'")
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address.")
     if len(payload.password) < 6:
@@ -120,6 +123,7 @@ def signup(payload: SignupRequest):
 @router.post("/login", response_model=AuthTokenResponse)
 def login(payload: LoginRequest):
     email = payload.email.strip().lower()
+    logger.info(f"POST /api/auth/login - processing login for normalized email: '{email}'")
     with get_db_session() as db:
         user = db.query(User).filter(User.email == email).first()
         if not user or not verify_password(payload.password, user.password_hash):

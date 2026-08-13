@@ -1,14 +1,15 @@
 import logging
 from typing import Dict, Any, Tuple, Optional, List
 
-from services.document_service import get_document
+from services.document_service import get_document, get_documents_by_project
 from services.chunking_service import chunk_document_text
 from services.embedding_service import embed_texts, embed_query
 from services.vector_store_service import (
     add_document_chunks,
     get_document_chunk_count,
     query_similar_chunks,
-    delete_document_chunks
+    delete_document_chunks,
+    get_collection
 )
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,27 @@ def index_document(
     return True, f"Document '{doc.filename}' indexed successfully into ChromaDB ({len(chunks)} chunks).", result_info
 
 
+def ensure_project_documents_indexed(project_id: int) -> int:
+    """
+    Scans MySQL documents for a project and auto-indexes any document 
+    that has extracted raw_text but 0 vector chunks in ChromaDB.
+    Returns count of newly indexed documents.
+    """
+    docs = get_documents_by_project(project_id)
+    indexed_count = 0
+
+    for doc in docs:
+        if doc.raw_text and doc.raw_text.strip():
+            chunk_cnt = get_document_chunk_count(doc.id)
+            if chunk_cnt == 0:
+                logger.info(f"Auto-indexing unindexed document ID {doc.id} ({doc.filename}) for project {project_id}")
+                ok, _, _ = index_document(doc.id)
+                if ok:
+                    indexed_count += 1
+
+    return indexed_count
+
+
 def get_document_index_status(document_id: int) -> Dict[str, Any]:
     """
     Checks ChromaDB vector count for a document.
@@ -93,16 +115,77 @@ def get_document_index_status(document_id: int) -> Dict[str, Any]:
     }
 
 
+def get_all_project_chunks(project_id: int, limit: int = 25) -> List[Dict[str, Any]]:
+    """
+    Retrieves all vector chunks for a project directly from ChromaDB without query embedding filtering.
+    Used for broad project summaries / overviews.
+    """
+    try:
+        collection = get_collection()
+        res = collection.get(
+            where={"project_id": project_id},
+            limit=limit
+        )
+
+        formatted = []
+        if res and res.get("documents"):
+            docs = res["documents"]
+            metas = res.get("metadatas", [{}] * len(docs))
+            ids = res.get("ids", [""] * len(docs))
+
+            for doc_text, meta, cid in zip(docs, metas, ids):
+                formatted.append({
+                    "id": cid,
+                    "project_id": meta.get("project_id"),
+                    "document_id": meta.get("document_id"),
+                    "filename": meta.get("filename", "Document"),
+                    "chunk_index": meta.get("chunk_index", 0),
+                    "chunk_text": doc_text,
+                    "distance": 0.1
+                })
+
+        return formatted
+    except Exception as e:
+        logger.error(f"Error fetching all project chunks for project {project_id}: {e}")
+        return []
+
+
+def get_chunks_by_filename(project_id: int, filename_query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Retrieves chunks belonging to a specific document filename for targeted document-level summarization.
+    """
+    try:
+        collection = get_collection()
+        # Get all chunks for project and filter by filename pattern
+        all_chunks = get_all_project_chunks(project_id, limit=50)
+        matched = []
+        fn_clean = filename_query.lower().strip()
+
+        for c in all_chunks:
+            chunk_fn = (c.get("filename") or "").lower()
+            if fn_clean in chunk_fn or chunk_fn in fn_clean:
+                matched.append(c)
+
+        return matched[:limit]
+    except Exception as e:
+        logger.error(f"Error fetching chunks for filename {filename_query}: {e}")
+        return []
+
+
 def search_project_documents(
     project_id: int,
     query: str,
-    top_k: int = 3
+    top_k: int = 6
 ) -> List[Dict[str, Any]]:
     """
     Performs semantic vector search over indexed chunks for a given project.
+    Ensures unindexed project documents are auto-indexed first.
     """
     if not query or not query.strip():
         return []
+
+    # Ensure any unindexed docs for this project get auto-indexed
+    ensure_project_documents_indexed(project_id)
 
     query_vector = embed_query(query)
     if not query_vector:

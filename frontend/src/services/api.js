@@ -42,7 +42,8 @@ export const documentsApi = {
 
 export const ragApi = {
   indexDocument: (docId) => api.post(`/documents/${docId}/index`),
-  askQuestion: (projectId, data) => api.post(`/projects/${projectId}/ask`, data),
+  askQuestion: (projectId, data) => api.post(`/projects/${projectId}/ask`, typeof data === 'string' ? { question: data } : data),
+  ask: (projectId, data) => api.post(`/projects/${projectId}/ask`, typeof data === 'string' ? { question: data } : data),
 };
 
 export const requirementsApi = {
@@ -59,7 +60,7 @@ export const userStoriesApi = {
 
 export const tasksApi = {
   getTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
-  createTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
+  createTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`),
   updateTask: (projectId, taskId, data) => api.put(`/projects/${projectId}/tasks/${taskId}`, data),
   aiGenerate: (projectId) => api.post(`/projects/${projectId}/tasks/ai-generate`),
 };
