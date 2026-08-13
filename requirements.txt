@@ -1,0 +1,16 @@
+streamlit
+python-dotenv
+sqlalchemy
+pymysql
+pypdf
+python-docx
+chromadb
+sentence-transformers
+google-genai
+google-generativeai
+fastapi
+uvicorn
+python-multipart
+httpx
+pyjwt
+passlib[bcrypt]
