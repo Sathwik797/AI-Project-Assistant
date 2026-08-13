@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from services.database import get_db_session
 from services.models import Project, TaskItem
 from services.ai_service import ask_gemini
+from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["Tasks"])
 
@@ -40,12 +41,9 @@ class TaskUpdate(BaseModel):
 
 
 @router.get("", response_model=List[TaskSchema])
-def get_project_tasks(project_id: int):
+def get_project_tasks(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         tasks = db.query(TaskItem).filter(TaskItem.project_id == project_id).order_by(TaskItem.id.asc()).all()
         return [
             TaskSchema(
@@ -65,12 +63,9 @@ def get_project_tasks(project_id: int):
 
 
 @router.post("", response_model=TaskSchema, status_code=status.HTTP_201_CREATED)
-def create_task(project_id: int, payload: TaskCreate):
+def create_task(project_id: int, payload: TaskCreate, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         count = db.query(TaskItem).filter(TaskItem.project_id == project_id).count()
         code = payload.task_code or f"TSK-{count + 1:03d}"
 
@@ -102,7 +97,8 @@ def create_task(project_id: int, payload: TaskCreate):
 
 
 @router.put("/{task_id}", response_model=TaskSchema)
-def update_task(project_id: int, task_id: int, payload: TaskUpdate):
+def update_task(project_id: int, task_id: int, payload: TaskUpdate, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
         task = db.query(TaskItem).filter(TaskItem.id == task_id, TaskItem.project_id == project_id).first()
         if not task:
@@ -136,24 +132,45 @@ def update_task(project_id: int, task_id: int, payload: TaskUpdate):
 
 
 @router.post("/ai-generate")
-def ai_generate_tasks(project_id: int):
+def ai_generate_tasks(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    proj = verify_project_ownership(project_id, current_user)
+
+    prompt = f"""You are a Lead Software Architect. Break down '{proj.name}' ({proj.description or ''}) into 1 engineering implementation task."""
+    answer = ask_gemini(prompt)
+
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+        count = db.query(TaskItem).filter(TaskItem.project_id == project_id).count()
+        code = f"TSK-{count + 1:03d}"
 
-        prompt = f"""You are a Lead Software Architect. Break down '{project.name}' ({project.description or ''}) into 3 engineering implementation tasks."""
-        answer = ask_gemini(prompt)
+        new_task = TaskItem(
+            project_id=project_id,
+            task_code=code,
+            title=f"Engineering Implementation Task for {proj.name}",
+            description=answer.strip(),
+            status="To Do",
+            priority="High",
+            assignee=current_user.full_name or "Lead Engineer",
+            due_date=None
+        )
+        db.add(new_task)
+        db.flush()
 
-        return {
-            "project_id": project_id,
-            "generated_text": answer,
-            "draft_task": {
-                "task_code": "TSK-AI-01",
-                "title": f"Engineering Implementation Task for {project.name}",
-                "description": answer[:300] + "...",
-                "status": "To Do",
-                "priority": "High",
-                "assignee": "Lead Engineer"
-            }
-        }
+        created_task = TaskSchema(
+            id=new_task.id,
+            project_id=new_task.project_id,
+            task_code=new_task.task_code,
+            title=new_task.title,
+            description=new_task.description,
+            status=new_task.status,
+            priority=new_task.priority,
+            assignee=new_task.assignee,
+            due_date=new_task.due_date,
+            created_at=new_task.created_at.isoformat()
+        )
+
+    return {
+        "project_id": project_id,
+        "generated_text": answer,
+        "created_task": created_task
+    }
+

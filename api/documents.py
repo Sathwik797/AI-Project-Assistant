@@ -1,8 +1,9 @@
 from typing import List
 import logging
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, status, Depends
 
-from api.schemas import DocumentResponse, DocumentDetailResponse
+from api.schemas import DocumentResponse, DocumentDetailResponse, QuestionRequest, QuestionResponse, SourceResponse
+from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 from services.project_service import get_project
 from services.document_service import (
     process_and_save_document,
@@ -16,6 +17,7 @@ from services.rag_ingestion_service import (
     ensure_project_documents_indexed
 )
 from services.vector_store_service import delete_document_chunks
+from services.ai_service import generate_answer_with_gemini
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +34,9 @@ class FastAPIFileAdapter:
 
 
 @router.get("/projects/{project_id}/documents", response_model=List[DocumentResponse])
-def list_project_documents(project_id: int):
+def list_project_documents(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
     """Retrieves all documents for a project including real-time vector index status."""
-    proj = get_project(project_id)
-    if not proj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found."
-        )
+    verify_project_ownership(project_id, current_user)
 
     # Ensure all documents for this project are indexed in ChromaDB
     ensure_project_documents_indexed(project_id)
@@ -62,17 +59,12 @@ def list_project_documents(project_id: int):
 
 
 @router.post("/projects/{project_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-async def upload_document(project_id: int, file: UploadFile = File(...)):
+async def upload_document(project_id: int, file: UploadFile = File(...), current_user: UserResponse = Depends(get_current_user_from_token)):
     """
     Uploads and processes a project document (PDF, DOCX, TXT up to 15 MB).
     Extracts raw text, saves metadata to MySQL, and auto-indexes into ChromaDB.
     """
-    proj = get_project(project_id)
-    if not proj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found."
-        )
+    verify_project_ownership(project_id, current_user)
 
     if not file.filename:
         raise HTTPException(
@@ -121,7 +113,7 @@ async def upload_document(project_id: int, file: UploadFile = File(...)):
 
 
 @router.get("/documents/{document_id}", response_model=DocumentDetailResponse)
-def get_document_detail(document_id: int):
+def get_document_detail(document_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
     """Retrieves document detail including extracted raw text and indexing status."""
     doc = get_document(document_id)
     if not doc:
@@ -129,6 +121,7 @@ def get_document_detail(document_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found."
         )
+    verify_project_ownership(doc.project_id, current_user)
 
     idx_status = get_document_index_status(doc.id)
 
@@ -147,7 +140,7 @@ def get_document_detail(document_id: int):
 
 
 @router.delete("/documents/{document_id}")
-def delete_project_document(document_id: int):
+def delete_project_document(document_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
     """Deletes physical file, MySQL database record, and ChromaDB vector embeddings for a document."""
     doc = get_document(document_id)
     if not doc:
@@ -155,6 +148,7 @@ def delete_project_document(document_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found."
         )
+    verify_project_ownership(doc.project_id, current_user)
 
     # Clean up ChromaDB vectors
     delete_document_chunks(document_id)
@@ -168,3 +162,67 @@ def delete_project_document(document_id: int):
         )
 
     return {"success": True, "message": msg}
+
+
+@router.post("/documents/{document_id}/chat", response_model=QuestionResponse)
+def chat_with_document(document_id: int, payload: QuestionRequest, current_user: UserResponse = Depends(get_current_user_from_token)):
+    """
+    Document AI Copilot Endpoint:
+    Directly analyzes the selected document's extracted raw text using Gemini.
+    Provides accurate, grounded document summarization and targeted question answering.
+    """
+    doc = get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found."
+        )
+    verify_project_ownership(doc.project_id, current_user)
+
+    if not payload.question or not payload.question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question text cannot be empty."
+        )
+
+    raw_text = doc.raw_text or ""
+    if not raw_text.strip():
+        return QuestionResponse(
+            success=False,
+            error=f"Document '{doc.filename}' contains no readable text content.",
+            has_context=False,
+            sources=[]
+        )
+
+    # Send document content directly to Gemini with strict document-grounding system prompt
+    context_str = f"TARGET DOCUMENT FILENAME: {doc.filename}\nFILE TYPE: {doc.file_type.upper()}\n\nFULL DOCUMENT TEXT:\n{raw_text[:35000]}"
+    
+    success, llm_answer = generate_answer_with_gemini(
+        question=payload.question.strip(),
+        context_str=context_str,
+        intent_type="DOCUMENT_SUMMARY"
+    )
+
+    if not success:
+        return QuestionResponse(
+            success=False,
+            error=llm_answer,
+            has_context=False,
+            sources=[]
+        )
+
+    source = SourceResponse(
+        filename=doc.filename,
+        chunk_index=0,
+        distance=0.0,
+        chunk_text=raw_text[:300] + ("..." if len(raw_text) > 300 else "")
+    )
+
+    return QuestionResponse(
+        success=True,
+        answer=llm_answer,
+        has_context=True,
+        sources=[source],
+        error=None
+    )
+

@@ -51,3 +51,9 @@ test_*.py
 *_test.py
 *.log
 *.tmp
+
+# Checked-in regression coverage for application contracts
+!tests/
+!tests/test_api_contracts.py
+!frontend/tests/
+!frontend/tests/api-contracts.test.mjs

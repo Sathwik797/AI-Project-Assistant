@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from services.database import get_db_session
 from services.models import Project, UserStory
 from services.ai_service import ask_gemini
+from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 
 router = APIRouter(prefix="/projects/{project_id}/user-stories", tags=["User Stories"])
 
@@ -33,12 +34,9 @@ class UserStoryCreate(BaseModel):
 
 
 @router.get("", response_model=List[UserStorySchema])
-def get_project_stories(project_id: int):
+def get_project_stories(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         stories = db.query(UserStory).filter(UserStory.project_id == project_id).order_by(UserStory.id.asc()).all()
         return [
             UserStorySchema(
@@ -59,12 +57,9 @@ def get_project_stories(project_id: int):
 
 
 @router.post("", response_model=UserStorySchema, status_code=status.HTTP_201_CREATED)
-def create_user_story(project_id: int, payload: UserStoryCreate):
+def create_user_story(project_id: int, payload: UserStoryCreate, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         count = db.query(UserStory).filter(UserStory.project_id == project_id).count()
         code = payload.story_code or f"US-{count + 1:03d}"
 
@@ -98,26 +93,48 @@ def create_user_story(project_id: int, payload: UserStoryCreate):
 
 
 @router.post("/ai-generate")
-def ai_generate_user_stories(project_id: int):
-    with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+def ai_generate_user_stories(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    proj = verify_project_ownership(project_id, current_user)
 
-        prompt = f"""You are an agile Product Owner. Generate a user story with acceptance criteria for '{project.name}' ({project.description or ''}).
+    prompt = f"""You are an agile Product Owner. Generate 1 user story with acceptance criteria for '{proj.name}' ({proj.description or ''}).
 Format as: As a [role], I want [goal], so that [benefit]."""
-        answer = ask_gemini(prompt)
+    answer = ask_gemini(prompt)
 
-        return {
-            "project_id": project_id,
-            "generated_text": answer,
-            "draft_story": {
-                "story_code": "US-AI-01",
-                "title": f"Agile Feature for {project.name}",
-                "user_role": "Product Manager",
-                "goal": "Query project documents using AI RAG",
-                "benefit": "Accelerate requirements verification",
-                "priority": "High",
-                "acceptance_criteria": "1. Document is indexed in ChromaDB.\n2. Gemini QA returns grounded source citations."
-            }
-        }
+    with get_db_session() as db:
+        count = db.query(UserStory).filter(UserStory.project_id == project_id).count()
+        code = f"US-{count + 1:03d}"
+
+        new_story = UserStory(
+            project_id=project_id,
+            story_code=code,
+            title=f"Agile Feature for {proj.name}",
+            user_role="Developer",
+            goal=f"Execute features for {proj.name}",
+            benefit="Accelerate project development",
+            priority="High",
+            status="Approved",
+            acceptance_criteria=answer.strip()
+        )
+        db.add(new_story)
+        db.flush()
+
+        created_story = UserStorySchema(
+            id=new_story.id,
+            project_id=new_story.project_id,
+            story_code=new_story.story_code,
+            title=new_story.title,
+            user_role=new_story.user_role,
+            goal=new_story.goal,
+            benefit=new_story.benefit,
+            priority=new_story.priority,
+            status=new_story.status,
+            acceptance_criteria=new_story.acceptance_criteria,
+            created_at=new_story.created_at.isoformat()
+        )
+
+    return {
+        "project_id": project_id,
+        "generated_text": answer,
+        "created_story": created_story
+    }
+

@@ -35,8 +35,6 @@ export default function Signup() {
         setError(detail);
       } else if (Array.isArray(detail) && detail[0]?.msg) {
         setError(detail[0].msg);
-      } else if (err.response?.status === 400) {
-        setError('An account with this email address already exists. Please Sign In.');
       } else if (!err.response) {
         setError('Network error: Unable to connect to backend server. Please try again.');
       } else {

@@ -63,9 +63,9 @@ export default function DocumentTable({ documents = [], onView, onIndex, onDelet
                   <td className="px-4 py-3 uppercase text-[11px] text-slate-500 dark:text-slate-400 font-bold">{doc.file_type}</td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{formatBytes(doc.file_size)}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge 
-                      status={doc.indexed ? "indexed" : "pending"} 
-                      label={doc.indexed ? "Indexed" : "Pending Index"} 
+                    <StatusBadge
+                      status={doc.is_indexed ? "indexed" : "pending"}
+                      label={doc.is_indexed ? "Indexed" : "Pending Index"}
                     />
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300 font-semibold">{doc.chunk_count || 0}</td>

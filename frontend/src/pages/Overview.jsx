@@ -69,7 +69,7 @@ export default function Overview() {
     }
   };
 
-  const indexedDocs = documents.filter(d => d.is_indexed || d.indexed);
+  const indexedDocs = documents.filter(d => d.is_indexed);
   const totalChunks = documents.reduce((acc, d) => acc + (d.chunk_count || 0), 0);
   const totalStorage = documents.reduce((acc, d) => acc + (d.file_size || 0), 0);
   const doneTasks = tasks.filter(t => t.status === 'Done');

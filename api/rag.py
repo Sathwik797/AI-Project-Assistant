@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from api.schemas import QuestionRequest, QuestionResponse, IndexResponse, SourceResponse
+from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 from services.project_service import get_project
 from services.document_service import get_document
 from services.rag_ingestion_service import index_document
@@ -9,13 +10,14 @@ router = APIRouter(tags=["RAG & AI"])
 
 
 @router.post("/documents/{document_id}/index", response_model=IndexResponse)
-def index_project_document(document_id: int):
+def index_project_document(document_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
     """
     Indexes a document into ChromaDB:
-    1. Fetches extracted raw text from MySQL.
-    2. Chunks text recursively.
-    3. Generates vector embeddings locally.
-    4. Upserts vectors into ChromaDB.
+    1. Validates document & project ownership.
+    2. Fetches extracted raw text from MySQL.
+    3. Chunks text recursively.
+    4. Generates vector embeddings locally.
+    5. Upserts vectors into ChromaDB.
     """
     doc = get_document(document_id)
     if not doc:
@@ -23,6 +25,8 @@ def index_project_document(document_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found."
         )
+
+    verify_project_ownership(doc.project_id, current_user)
 
     ok, msg, info = index_document(document_id)
     if not ok:
@@ -39,21 +43,16 @@ def index_project_document(document_id: int):
 
 
 @router.post("/projects/{project_id}/ask", response_model=QuestionResponse)
-def ask_project_rag_question(project_id: int, payload: QuestionRequest):
+def ask_project_rag_question(project_id: int, payload: QuestionRequest, current_user: UserResponse = Depends(get_current_user_from_token)):
     """
     Full RAG Question Answering Endpoint:
-    1. Validates project existence.
+    1. Validates project existence and ownership.
     2. Performs project-isolated vector similarity search in ChromaDB.
     3. Filters chunks by relevance threshold.
     4. Calls Gemini 2.5 Flash for grounded answer generation.
     5. Returns grounded answer with source citations.
     """
-    proj = get_project(project_id)
-    if not proj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found."
-        )
+    verify_project_ownership(project_id, current_user)
 
     if not payload.question or not payload.question.strip():
         raise HTTPException(
@@ -88,3 +87,4 @@ def ask_project_rag_question(project_id: int, payload: QuestionRequest):
         sources=formatted_sources,
         error=None
     )
+

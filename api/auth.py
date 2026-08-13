@@ -86,6 +86,22 @@ def get_current_user_from_token(authorization: str = Header(None)) -> UserRespon
         raise HTTPException(status_code=401, detail="Token signature expired or invalid")
 
 
+def verify_project_ownership(project_id: int, current_user: UserResponse):
+    from services.project_service import get_project
+    proj = get_project(project_id)
+    if not proj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found."
+        )
+    if proj.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this project."
+        )
+    return proj
+
+
 @router.post("/signup", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest):
     email = payload.email.strip().lower()

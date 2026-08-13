@@ -13,6 +13,7 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import Profile from './pages/auth/Profile';
 
 import Overview from './pages/Overview';
+import Assistant from './pages/Assistant';
 import Documents from './pages/Documents';
 import Requirements from './pages/Requirements';
 import UserStories from './pages/UserStories';
@@ -101,7 +102,7 @@ function MainAppContent() {
     >
       <Routes>
         <Route
-          path="/"
+          path="/projects"
           element={
             projects.length > 0 ? (
               <Navigate to={`/projects/${projects[0].id}/overview`} replace />
@@ -122,7 +123,7 @@ function MainAppContent() {
         />
 
         <Route
-          path="/list"
+          path="/projects/list"
           element={
             <div className="p-6 max-w-4xl mx-auto space-y-4">
               <h3 className="text-lg font-bold text-[#171717] flex items-center gap-2">
@@ -162,9 +163,10 @@ function MainAppContent() {
 
         <Route path="/profile" element={<Profile />} />
 
-        <Route path="/:projectId" element={<WorkspaceLayout />}>
+        <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<Overview />} />
+          <Route path="assistant" element={<Assistant />} />
           <Route path="documents" element={<Documents />} />
           <Route path="requirements" element={<Requirements />} />
           <Route path="user-stories" element={<UserStories />} />
@@ -178,7 +180,7 @@ function MainAppContent() {
             projects.length > 0 ? (
               <Navigate to={`/projects/${projects[0].id}/overview`} replace />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/projects" replace />
             )
           }
         />
@@ -203,23 +205,7 @@ export default function App() {
 
             {/* Protected Application & Workspace Routes */}
             <Route
-              path="/projects/*"
-              element={
-                <ProtectedRoute>
-                  <MainAppContent />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/activity"
-              element={
-                <ProtectedRoute>
-                  <MainAppContent />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
+              path="/*"
               element={
                 <ProtectedRoute>
                   <MainAppContent />

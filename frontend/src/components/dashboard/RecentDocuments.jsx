@@ -43,9 +43,9 @@ export default function RecentDocuments({ documents = [], projectId }) {
                   </div>
                 </div>
                 <div className="shrink-0">
-                  <StatusBadge 
-                    status={doc.indexed ? "indexed" : "pending"} 
-                    label={doc.indexed ? `Indexed (${doc.chunk_count} chunks)` : "Pending Index"} 
+                  <StatusBadge
+                    status={doc.is_indexed ? "indexed" : "pending"}
+                    label={doc.is_indexed ? `Indexed (${doc.chunk_count} chunks)` : "Pending Index"}
                   />
                 </div>
               </div>

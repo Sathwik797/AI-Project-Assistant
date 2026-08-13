@@ -38,6 +38,12 @@ export const documentsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   deleteDocument: (docId) => api.delete(`/documents/${docId}`),
+  chatWithDocument: (docId, data) =>
+    api.post(`/documents/${docId}/chat`, typeof data === 'string' ? { question: data } : data),
+};
+
+export const copilotApi = {
+  chat: (data) => api.post('/copilot/chat', data),
 };
 
 export const ragApi = {
@@ -60,7 +66,7 @@ export const userStoriesApi = {
 
 export const tasksApi = {
   getTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
-  createTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`),
+  createTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
   updateTask: (projectId, taskId, data) => api.put(`/projects/${projectId}/tasks/${taskId}`, data),
   aiGenerate: (projectId) => api.post(`/projects/${projectId}/tasks/ai-generate`),
 };

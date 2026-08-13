@@ -31,6 +31,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectResponse(BaseModel):
     id: int
+    owner_id: int
     name: str
     description: Optional[str] = None
     created_at: datetime
@@ -82,7 +83,8 @@ class IndexInfoResponse(BaseModel):
 class IndexResponse(BaseModel):
     success: bool
     message: str
-    index_info: Optional[Dict[str, Any]] = None
+    # Successful indexing always returns this metadata under index_info.
+    index_info: Optional[IndexInfoResponse] = None
 
 
 class QuestionRequest(BaseModel):

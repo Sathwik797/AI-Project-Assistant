@@ -73,7 +73,7 @@ export default function Assistant() {
     }
   };
 
-  const indexedDocs = documents.filter(d => d.indexed);
+  const indexedDocs = documents.filter(d => d.is_indexed);
   const totalChunks = documents.reduce((acc, d) => acc + (d.chunk_count || 0), 0);
 
   return (
@@ -166,9 +166,9 @@ export default function Assistant() {
                         <span className="truncate font-semibold text-slate-800 dark:text-slate-200">{d.filename}</span>
                       </div>
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${
-                        d.indexed ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
+                        d.is_indexed ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
                       }`}>
-                        {d.indexed ? `${d.chunk_count} Chunks` : 'Pending'}
+                        {d.is_indexed ? `${d.chunk_count} Chunks` : 'Pending'}
                       </span>
                     </div>
                   ))}

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from services.database import get_db_session
 from services.models import Project, RequirementConflict
 from services.ai_service import ask_gemini
+from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 
 router = APIRouter(prefix="/projects/{project_id}/conflicts", tags=["Conflicts"])
 
@@ -31,12 +32,9 @@ class ConflictCreate(BaseModel):
 
 
 @router.get("", response_model=List[ConflictSchema])
-def get_project_conflicts(project_id: int):
+def get_project_conflicts(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         conflicts = db.query(RequirementConflict).filter(RequirementConflict.project_id == project_id).order_by(RequirementConflict.id.asc()).all()
         return [
             ConflictSchema(
@@ -56,12 +54,9 @@ def get_project_conflicts(project_id: int):
 
 
 @router.post("", response_model=ConflictSchema, status_code=status.HTTP_201_CREATED)
-def create_conflict(project_id: int, payload: ConflictCreate):
+def create_conflict(project_id: int, payload: ConflictCreate, current_user: UserResponse = Depends(get_current_user_from_token)):
+    verify_project_ownership(project_id, current_user)
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
         new_conflict = RequirementConflict(
             project_id=project_id,
             title=payload.title.strip(),
@@ -90,24 +85,43 @@ def create_conflict(project_id: int, payload: ConflictCreate):
 
 
 @router.post("/ai-generate")
-def ai_scan_conflicts(project_id: int):
+def ai_scan_conflicts(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
+    proj = verify_project_ownership(project_id, current_user)
+
+    prompt = f"""You are a Systems Analyst. Scan project '{proj.name}' ({proj.description or ''}) for potential requirement ambiguities or specification conflicts.
+Return a clear conflict report with resolution advice."""
+    answer = ask_gemini(prompt)
+
     with get_db_session() as db:
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+        new_conflict = RequirementConflict(
+            project_id=project_id,
+            title=f"Specification Ambiguity in {proj.name}",
+            severity="Medium",
+            description=answer.strip(),
+            source_a="project_spec.pdf",
+            source_b="architecture_doc.docx",
+            resolution="Harmonize document specifications across team leads.",
+            status="Open"
+        )
+        db.add(new_conflict)
+        db.flush()
 
-        prompt = f"""You are a Systems Analyst. Scan project '{project.name}' ({project.description or ''}) for potential requirement ambiguities or specification conflicts."""
-        answer = ask_gemini(prompt)
+        created_conflict = ConflictSchema(
+            id=new_conflict.id,
+            project_id=new_conflict.project_id,
+            title=new_conflict.title,
+            severity=new_conflict.severity,
+            description=new_conflict.description,
+            source_a=new_conflict.source_a,
+            source_b=new_conflict.source_b,
+            resolution=new_conflict.resolution,
+            status=new_conflict.status,
+            created_at=new_conflict.created_at.isoformat()
+        )
 
-        return {
-            "project_id": project_id,
-            "generated_text": answer,
-            "draft_conflict": {
-                "title": f"Specification Ambiguity in {project.name}",
-                "severity": "Medium",
-                "description": answer[:300] + "...",
-                "source_a": "requirements_spec.pdf",
-                "source_b": "architecture_doc.docx",
-                "resolution": "Harmonize document specifications across team leaders."
-            }
-        }
+    return {
+        "project_id": project_id,
+        "generated_text": answer,
+        "created_conflict": created_conflict
+    }
+

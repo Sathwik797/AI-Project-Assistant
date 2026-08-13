@@ -15,6 +15,7 @@ from api.requirements import router as requirements_router
 from api.stories import router as stories_router
 from api.tasks import router as tasks_router
 from api.conflicts import router as conflicts_router
+from api.copilot import router as copilot_router
 
 # Configure Logging
 logging.basicConfig(
@@ -76,6 +77,7 @@ app.include_router(requirements_router, prefix="/api")
 app.include_router(stories_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 app.include_router(conflicts_router, prefix="/api")
+app.include_router(copilot_router, prefix="/api")
 
 
 @app.get("/")

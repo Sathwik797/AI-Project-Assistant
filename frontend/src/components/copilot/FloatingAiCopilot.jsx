@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ragApi } from '../../services/api';
+import { copilotApi } from '../../services/api';
 import { 
   Sparkles, 
   X, 
@@ -44,39 +44,39 @@ export default function FloatingAiCopilot({ activeProject, projectId }) {
     switch (pageContext) {
       case 'Documents':
         return [
-          'Summarize key specifications in uploaded docs',
-          'Find missing technical requirements',
+          'How do I upload and index a project document?',
+          'What is the difference between Document AI and Project RAG?',
           'Extract compliance rules from specs'
         ];
       case 'Requirements':
         return [
-          'Generate testable acceptance criteria',
-          'Find ambiguous specifications',
+          'How do I create a requirement in this app?',
+          'What is the difference between functional and non-functional requirements?',
           role === 'Lead Architect' ? 'Analyze technical requirements' : 'Explain this requirement'
         ];
       case 'User Stories':
         return [
-          'Generate agile user stories from requirements',
-          'Check story traceability to REQ codes',
-          'Refine acceptance criteria'
+          'What is an agile user story?',
+          'How to format user stories with role, goal, and benefit?',
+          'How do I link user stories to requirement codes?'
         ];
       case 'Tasks':
         return [
-          'Break requirement into engineering tasks',
-          'Identify sprint dependencies',
-          'Explain implementation steps'
+          'How should I break a requirement into technical tasks?',
+          'How to assign tasks to sprint team members?',
+          'Explain implementation steps for a task'
         ];
       case 'Conflicts':
         return [
-          'Analyze specification contradictions',
-          'Suggest resolution options between docs',
-          'Compare source document quotes'
+          'How does the conflict detector work?',
+          'How to resolve specification contradictions?',
+          'What causes requirement conflicts?'
         ];
       default:
         return [
-          'Summarize the project',
-          'What are the key project risks?',
-          'Generate executive project brief'
+          'What does AI Project Assistant do?',
+          'How do I navigate between project modules?',
+          'Summarize this project status'
         ];
     }
   };
@@ -148,18 +148,23 @@ export default function FloatingAiCopilot({ activeProject, projectId }) {
     setError(null);
 
     try {
-      // Execute grounded RAG query using canonical askQuestion service endpoint
-      const res = await ragApi.askQuestion(targetProjId, { question: query || 'Summarize project specifications' });
+      // Call dedicated Main Copilot service API endpoint
+      const res = await copilotApi.chat({
+        project_id: targetProjId,
+        message: query || 'How does AI Project Assistant work?',
+        page_context: pageContext,
+        user_role: user?.role || 'Developer'
+      });
       const apiData = res.data || {};
 
       let responseText = apiData.answer || apiData.error;
       
       if (!responseText) {
-        responseText = "I couldn't find enough information in the project documents to answer your question.";
+        responseText = "I'm your AI Copilot. How can I assist you with this application or project?";
       }
 
       if (currentAttachments.some(a => a.type === 'image')) {
-        responseText += `\n\n[Note: Received ${currentAttachments.filter(a => a.type === 'image').length} image attachment(s). Standard text RAG retrieval has been performed.]`;
+        responseText += `\n\n[Note: Received ${currentAttachments.filter(a => a.type === 'image').length} image attachment(s).]`;
       }
 
       const aiMessage = {

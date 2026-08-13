@@ -7,7 +7,7 @@ from services.models import Project
 logger = logging.getLogger(__name__)
 
 
-def create_project(name: str, description: Optional[str] = None) -> Tuple[bool, str, Optional[Project]]:
+def create_project(name: str, description: Optional[str] = None, owner_id: int = 1) -> Tuple[bool, str, Optional[Project]]:
     if not name or not name.strip():
         return False, "Project name cannot be empty.", None
 
@@ -19,13 +19,14 @@ def create_project(name: str, description: Optional[str] = None) -> Tuple[bool, 
 
     try:
         with get_db_session() as db:
-            new_project = Project(name=name, description=clean_description)
+            new_project = Project(name=name, description=clean_description, owner_id=owner_id)
             db.add(new_project)
             db.flush()
             db.refresh(new_project)
             
             detached_project = Project(
                 id=new_project.id,
+                owner_id=new_project.owner_id,
                 name=new_project.name,
                 description=new_project.description,
                 created_at=new_project.created_at,
@@ -40,13 +41,17 @@ def create_project(name: str, description: Optional[str] = None) -> Tuple[bool, 
         return False, "An unexpected error occurred while creating the project.", None
 
 
-def get_projects() -> List[Project]:
+def get_projects(owner_id: Optional[int] = None) -> List[Project]:
     try:
         with get_db_session() as db:
-            projects = db.query(Project).order_by(Project.created_at.desc()).all()
+            query = db.query(Project)
+            if owner_id is not None:
+                query = query.filter(Project.owner_id == owner_id)
+            projects = query.order_by(Project.created_at.desc()).all()
             return [
                 Project(
                     id=p.id,
+                    owner_id=p.owner_id,
                     name=p.name,
                     description=p.description,
                     created_at=p.created_at,
@@ -62,17 +67,21 @@ def get_projects() -> List[Project]:
         return []
 
 
-def get_project(project_id: int) -> Optional[Project]:
+def get_project(project_id: int, owner_id: Optional[int] = None) -> Optional[Project]:
     if not isinstance(project_id, int) or project_id <= 0:
         return None
 
     try:
         with get_db_session() as db:
-            project = db.query(Project).filter(Project.id == project_id).first()
+            query = db.query(Project).filter(Project.id == project_id)
+            if owner_id is not None:
+                query = query.filter(Project.owner_id == owner_id)
+            project = query.first()
             if not project:
                 return None
             return Project(
                 id=project.id,
+                owner_id=project.owner_id,
                 name=project.name,
                 description=project.description,
                 created_at=project.created_at,
@@ -86,7 +95,7 @@ def get_project(project_id: int) -> Optional[Project]:
         return None
 
 
-def update_project(project_id: int, name: str, description: Optional[str] = None) -> Tuple[bool, str, Optional[Project]]:
+def update_project(project_id: int, name: str, description: Optional[str] = None, owner_id: Optional[int] = None) -> Tuple[bool, str, Optional[Project]]:
     if not name or not name.strip():
         return False, "Project name cannot be empty.", None
 
@@ -95,7 +104,10 @@ def update_project(project_id: int, name: str, description: Optional[str] = None
 
     try:
         with get_db_session() as db:
-            project = db.query(Project).filter(Project.id == project_id).first()
+            query = db.query(Project).filter(Project.id == project_id)
+            if owner_id is not None:
+                query = query.filter(Project.owner_id == owner_id)
+            project = query.first()
             if not project:
                 return False, "Project not found.", None
             
@@ -105,6 +117,7 @@ def update_project(project_id: int, name: str, description: Optional[str] = None
 
             detached_project = Project(
                 id=project.id,
+                owner_id=project.owner_id,
                 name=project.name,
                 description=project.description,
                 created_at=project.created_at,
@@ -116,10 +129,13 @@ def update_project(project_id: int, name: str, description: Optional[str] = None
         return False, "Failed to update project due to database error.", None
 
 
-def delete_project(project_id: int) -> Tuple[bool, str]:
+def delete_project(project_id: int, owner_id: Optional[int] = None) -> Tuple[bool, str]:
     try:
         with get_db_session() as db:
-            project = db.query(Project).filter(Project.id == project_id).first()
+            query = db.query(Project).filter(Project.id == project_id)
+            if owner_id is not None:
+                query = query.filter(Project.owner_id == owner_id)
+            project = query.first()
             if not project:
                 return False, "Project not found."
             
@@ -128,3 +144,4 @@ def delete_project(project_id: int) -> Tuple[bool, str]:
     except SQLAlchemyError as e:
         logger.error(f"Database error deleting project {project_id}: {e}")
         return False, "Failed to delete project due to database error."
+

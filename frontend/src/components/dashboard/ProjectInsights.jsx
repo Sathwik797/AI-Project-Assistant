@@ -3,7 +3,7 @@ import { Sparkles, Database, Bot } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function ProjectInsights({ project, documents = [], projectId }) {
-  const indexedCount = documents.filter(d => d.indexed).length;
+  const indexedCount = documents.filter(d => d.is_indexed).length;
   const totalDocs = documents.length;
   const isReady = indexedCount > 0;
 

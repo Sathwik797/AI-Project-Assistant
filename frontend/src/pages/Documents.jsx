@@ -54,7 +54,8 @@ export default function Documents() {
     setStatusMessage(null);
     try {
       const res = await ragApi.indexDocument(docId);
-      setStatusMessage({ type: 'success', text: `Document indexed successfully! ${res.data.chunks_created} chunks added to ChromaDB.` });
+      const chunkCount = res.data.index_info?.chunk_count ?? 0;
+      setStatusMessage({ type: 'success', text: `Document indexed successfully! ${chunkCount} chunks added to ChromaDB.` });
       fetchDocuments();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to index document.';
@@ -101,28 +102,28 @@ export default function Documents() {
       {/* Top Header & Search Filter Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Project Knowledge Base</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <h3 className="text-lg font-bold text-[#1F2937] tracking-tight">Project Knowledge Base</h3>
+          <p className="text-xs text-[#6B7280] mt-0.5">
             Manage, inspect and index document sources for <strong>{activeProject?.name || 'this project'}</strong>.
           </p>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-48">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#6B7280]" />
             <input
               type="text"
               placeholder="Search docs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+              className="w-full bg-[#FFFFFF] border border-[#E5E1D8] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[#1F2937] outline-none focus:ring-1 focus:ring-[#C8923E] shadow-2xs"
             />
           </div>
 
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none shadow-2xs cursor-pointer"
+            className="bg-[#FFFFFF] border border-[#E5E1D8] rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#1F2937] outline-none shadow-2xs cursor-pointer"
           >
             <option value="ALL">All Types</option>
             <option value="PDF">PDF</option>
@@ -135,13 +136,13 @@ export default function Documents() {
       {/* Notification Banner */}
       {statusMessage && (
         <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
-          statusMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+          statusMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
         }`}>
           <div className="flex items-center gap-2 font-semibold">
-            {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />}
+            {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
             <span>{statusMessage.text}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">×</button>
+          <button onClick={() => setStatusMessage(null)} className="text-[#6B7280] hover:text-[#1F2937] cursor-pointer">×</button>
         </div>
       )}
 
