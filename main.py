@@ -31,6 +31,9 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     """Lifespan event handler for safe database initialization on startup."""
     logger.info("Initializing AI Project Assistant API backend...")
+    jwt_secret = os.getenv("JWT_SECRET_KEY", "")
+    if len(jwt_secret) < 32:
+        raise RuntimeError("JWT_SECRET_KEY must be configured with at least 32 characters.")
     db_ok, db_msg = check_db_connection()
     if db_ok:
         try:
@@ -93,4 +96,4 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

@@ -103,5 +103,5 @@ class QuestionResponse(BaseModel):
     success: bool
     answer: Optional[str] = None
     has_context: bool = False
-    sources: List[SourceResponse] = []
+    sources: List[SourceResponse] = Field(default_factory=list)
     error: Optional[str] = None

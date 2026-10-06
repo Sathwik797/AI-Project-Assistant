@@ -89,6 +89,8 @@ def ai_generate_requirements(project_id: int, current_user: UserResponse = Depen
     prompt = f"""You are a senior business analyst. Extract 1 key functional requirement for the software project titled '{proj.name}' ({proj.description or ''}).
 Provide a concise title and detailed specification."""
     answer = ask_gemini(prompt)
+    if not answer:
+        raise HTTPException(status_code=503, detail="AI generation service is currently unavailable.")
 
     with get_db_session() as db:
         count = db.query(Requirement).filter(Requirement.project_id == project_id).count()

@@ -1,7 +1,10 @@
 import unittest
+import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from unittest.mock import patch
+
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-key-with-32-plus-bytes")
 
 import jwt
 
@@ -113,6 +116,7 @@ class ApiContractTests(unittest.TestCase):
         password_hash = hash_password("correct horse battery staple")
         self.assertTrue(verify_password("correct horse battery staple", password_hash))
         self.assertFalse(verify_password("incorrect", password_hash))
+        self.assertTrue(password_hash.startswith("pbkdf2_sha256$"))
 
         token = create_access_token({"sub": "7", "email": "user@example.com"})
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

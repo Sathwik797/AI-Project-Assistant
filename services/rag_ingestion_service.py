@@ -56,7 +56,7 @@ def index_document(
         embeddings = embed_texts(chunk_texts)
     except Exception as e:
         logger.error(f"Embedding generation failed for document {document_id}: {e}")
-        return False, f"Embedding generation failed: {e}", {}
+        return False, "Embedding generation failed. Please try again later.", {}
 
     # Step 3: Upsert into ChromaDB
     saved = add_document_chunks(
@@ -115,17 +115,17 @@ def get_document_index_status(document_id: int) -> Dict[str, Any]:
     }
 
 
-def get_all_project_chunks(project_id: int, limit: int = 25) -> List[Dict[str, Any]]:
+def get_all_project_chunks(project_id: int, limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Retrieves all vector chunks for a project directly from ChromaDB without query embedding filtering.
     Used for broad project summaries / overviews.
     """
     try:
         collection = get_collection()
-        res = collection.get(
-            where={"project_id": project_id},
-            limit=limit
-        )
+        query_kwargs = {"where": {"project_id": project_id}}
+        if limit is not None:
+            query_kwargs["limit"] = limit
+        res = collection.get(**query_kwargs)
 
         formatted = []
         if res and res.get("documents"):
@@ -157,7 +157,7 @@ def get_chunks_by_filename(project_id: int, filename_query: str, limit: int = 20
     try:
         collection = get_collection()
         # Get all chunks for project and filter by filename pattern
-        all_chunks = get_all_project_chunks(project_id, limit=50)
+        all_chunks = get_all_project_chunks(project_id, limit=None)
         matched = []
         fn_clean = filename_query.lower().strip()
 

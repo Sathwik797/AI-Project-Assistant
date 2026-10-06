@@ -4,6 +4,8 @@ from typing import List, Optional
 from services.database import get_db_session
 from services.models import Project, RequirementConflict
 from services.ai_service import ask_gemini
+from services.ai_service import answer_rag_question
+from services.document_service import get_documents_by_project
 from api.auth import get_current_user_from_token, verify_project_ownership, UserResponse
 
 router = APIRouter(prefix="/projects/{project_id}/conflicts", tags=["Conflicts"])
@@ -88,9 +90,18 @@ def create_conflict(project_id: int, payload: ConflictCreate, current_user: User
 def ai_scan_conflicts(project_id: int, current_user: UserResponse = Depends(get_current_user_from_token)):
     proj = verify_project_ownership(project_id, current_user)
 
-    prompt = f"""You are a Systems Analyst. Scan project '{proj.name}' ({proj.description or ''}) for potential requirement ambiguities or specification conflicts.
-Return a clear conflict report with resolution advice."""
-    answer = ask_gemini(prompt)
+    documents = get_documents_by_project(project_id)
+    if not documents:
+        raise HTTPException(status_code=400, detail="Upload at least one project document before running a conflict scan.")
+
+    rag_result = answer_rag_question(
+        project_id,
+        "Identify concrete contradictions, ambiguities, or incompatible requirements across the project documents. Cite the relevant document names and explain a practical resolution for each issue."
+    )
+    if not rag_result.get("success"):
+        raise HTTPException(status_code=503, detail=rag_result.get("error", "Conflict analysis service is currently unavailable."))
+    answer = rag_result.get("answer") or "No conflicts were identified."
+    source_names = sorted({src.get("filename") for src in rag_result.get("sources", []) if src.get("filename")})
 
     with get_db_session() as db:
         new_conflict = RequirementConflict(
@@ -98,8 +109,8 @@ Return a clear conflict report with resolution advice."""
             title=f"Specification Ambiguity in {proj.name}",
             severity="Medium",
             description=answer.strip(),
-            source_a="project_spec.pdf",
-            source_b="architecture_doc.docx",
+            source_a=source_names[0] if source_names else None,
+            source_b=source_names[1] if len(source_names) > 1 else None,
             resolution="Harmonize document specifications across team leads.",
             status="Open"
         )

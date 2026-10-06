@@ -137,6 +137,8 @@ def ai_generate_tasks(project_id: int, current_user: UserResponse = Depends(get_
 
     prompt = f"""You are a Lead Software Architect. Break down '{proj.name}' ({proj.description or ''}) into 1 engineering implementation task."""
     answer = ask_gemini(prompt)
+    if not answer:
+        raise HTTPException(status_code=503, detail="AI generation service is currently unavailable.")
 
     with get_db_session() as db:
         count = db.query(TaskItem).filter(TaskItem.project_id == project_id).count()

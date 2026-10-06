@@ -169,7 +169,7 @@ def process_copilot_chat(
     message: str,
     page_context: str = "Overview",
     user_role: str = "Developer",
-    attachments: List[Dict[str, Any]] = []
+    attachments: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """
     Main Copilot Chat Processor (NON-RAG BY DEFAULT):
@@ -179,6 +179,17 @@ def process_copilot_chat(
     4. Prepares Gemini multimodal contents if attachments are present.
     5. Calls Gemini with application context and returns grounded product/project response.
     """
+    attachments = attachments or []
+
+    if len(attachments) > 5:
+        return {
+            "success": False,
+            "error": "A maximum of 5 attachments is allowed.",
+            "answer": None,
+            "mode": "copilot",
+            "sources": []
+        }
+
     if not message and not attachments:
         return {
             "success": False,
@@ -270,7 +281,9 @@ def process_copilot_chat(
                 # Strip base64 header if present
                 if "," in content_b64:
                     content_b64 = content_b64.split(",")[1]
-                raw_bytes = base64.b64decode(content_b64)
+                raw_bytes = base64.b64decode(content_b64, validate=True)
+                if len(raw_bytes) > 10 * 1024 * 1024:
+                    raise ValueError("Attachment exceeds the 10 MB limit.")
                 image_part = types.Part.from_bytes(data=raw_bytes, mime_type=mime_type)
                 contents.append(image_part)
                 logger.info(f"Attached image {att_name} ({mime_type}) successfully converted for Gemini multimodal processing.")

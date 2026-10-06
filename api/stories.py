@@ -99,6 +99,8 @@ def ai_generate_user_stories(project_id: int, current_user: UserResponse = Depen
     prompt = f"""You are an agile Product Owner. Generate 1 user story with acceptance criteria for '{proj.name}' ({proj.description or ''}).
 Format as: As a [role], I want [goal], so that [benefit]."""
     answer = ask_gemini(prompt)
+    if not answer:
+        raise HTTPException(status_code=503, detail="AI generation service is currently unavailable.")
 
     with get_db_session() as db:
         count = db.query(UserStory).filter(UserStory.project_id == project_id).count()

@@ -149,7 +149,7 @@ MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=project_assistant
-JWT_SECRET_KEY=your_secure_jwt_secret_key_2026
+JWT_SECRET_KEY=generate-a-random-secret-of-at-least-32-characters
 ```
 
 ---

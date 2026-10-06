@@ -72,13 +72,16 @@ async def upload_document(project_id: int, file: UploadFile = File(...), current
             detail="Filename cannot be empty."
         )
 
+    max_file_size = 15 * 1024 * 1024
+    if file.size is not None and file.size > max_file_size:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File exceeds the 15 MB upload limit.")
+
     try:
-        content = await file.read()
-    except Exception as read_err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read uploaded file stream: {read_err}"
-        )
+        content = await file.read(max_file_size + 1)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to read uploaded file.")
+    if len(content) > max_file_size:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File exceeds the 15 MB upload limit.")
 
     adapter = FastAPIFileAdapter(file, content)
     ok, msg, new_doc = process_and_save_document(project_id, adapter)
